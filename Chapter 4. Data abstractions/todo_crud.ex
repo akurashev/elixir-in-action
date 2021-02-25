@@ -30,7 +30,9 @@ defmodule TodoList do
 
   def update_entry(todo_list, entry_id, updater_fun) do
     case Map.fetch(todo_list.entries, entry_id) do
-      :error -> todo_list
+      :error ->
+        todo_list
+
       {:ok, old_entry} ->
         old_entry_id = old_entry.id
         new_entry = %{id: ^old_entry_id, title: _, date: _} = updater_fun.(old_entry)
@@ -46,5 +48,50 @@ defmodule TodoList do
   def delete_entry(todo_list, entry_id) do
     new_entries = Map.delete(todo_list.entries, entry_id)
     %TodoList{todo_list | entries: new_entries}
+  end
+end
+
+defmodule TodoList.CsvImporter do
+  def import(path) do
+    path
+    |> read_file
+    |> build_entries
+    |> TodoList.new()
+  end
+
+  defp read_file(path) do
+    path
+    |> File.stream!()
+    |> Stream.map(&String.replace(&1, "\n", ""))
+  end
+
+  defp build_entries(rows) do
+    rows
+    |> extract_columns
+    |> Stream.map(fn [date, title] ->
+      {parse_date(date), title}
+    end)
+    |> build_entry_map
+  end
+
+  defp extract_columns(rows) do
+    rows
+    |> Stream.map(&String.split(&1, ","))
+  end
+
+  defp parse_date(string) do
+    [year, month, day] =
+      string
+      |> String.split("/")
+      |> Enum.map(&String.to_integer/1)
+
+    {:ok, date} = Date.new(year, month, day)
+
+    date
+  end
+
+  defp build_entry_map(rows) do
+    rows
+    |> Stream.map(fn {date, title} -> %{date: date, title: title} end)
   end
 end
